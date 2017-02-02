@@ -1,21 +1,22 @@
-/*************************************CLASSE INSTANCIAS E SEUS M…TODOS ****************************************/
+/*************************************CLASSE INSTANCIAS E SEUS M‚Ä¶TODOS ****************************************/
 
 #include "HeaderBPP.h"
 
 
 
-//construtor que cria inst‚ncia usando o nome do arquivo de entrada
+//construtor que cria inst‚Äöncia usando o nome do arquivo de entrada
 Instances::Instances(string str, int m)
-	: inputFile(str), mCategories(m), nElements(0)
+	: inputFile(str), mCategories(m), nElements(0), bestLB(0)
 {
 	load();
+	solveRelaxedProblem();
 }
 
 
 
-/************************************ FUN«’ES 'GLOBAIS' ****************************************/
+/************************************ FUN¬´‚ÄôES 'GLOBAIS' ****************************************/
 
-//funÁ„o que imprime uma matriz na tela
+//fun√Å‚Äûo que imprime uma matriz na tela
 void printMatrix(vector< vector<int> > matrix) {
 
 	for (unsigned i = 0; i< matrix.size(); i++) {
@@ -33,11 +34,11 @@ void printMatrix(vector< vector<int> > matrix) {
 }
 
 
-//mÈtodo que lÍ os dados referentes aos objetos - primeiro lÍ matriz completa, depois armazena nos vetores allElements e firstObjectPosition
+//m√àtodo que l√ç os dados referentes aos objetos - primeiro l√ç matriz completa, depois armazena nos vetores allElements e firstObjectPosition
 void Instances::load() {
 
 
-	//abre o arquivo de entrada da inst‚ncia
+	//abre o arquivo de entrada da inst‚Äöncia
 	ifstream dataFile;
 	dataFile.open(inputFile);
 
@@ -46,7 +47,7 @@ void Instances::load() {
 		cerr << "Nao foi possivel abrir arquivo de entrada!\n";
 	}
 
-	//se abrir com sucesso, lÍ e armazena os dados do arquivo
+	//se abrir com sucesso, l√ç e armazena os dados do arquivo
 	else {
 
 		cout << "\nArquivo com dados da instancia aberto com sucesso!" << endl;
@@ -56,32 +57,33 @@ void Instances::load() {
 		//matriz com dados de entrada
 		vector< vector<int> > matrixData;
 
-		//vari·vel inteira para armazenar os dados lidos
+		//vari¬∑vel inteira para armazenar os dados lidos
 		int input;
 
 		//string line para armazenar linhas lidas
 		string line;
 
-		//lÍ e ignora todas as linhas atÈ encontrar a linha EDGE_WEIGHT_TYPE
+#ifndef INST_AUGMENTED
+		//l√ç e ignora todas as linhas at√à encontrar a linha EDGE_WEIGHT_TYPE
 		do {
 			getline(dataFile, line);
 		} while (line.find("EDGE_WEIGHT_TYPE") > 2);
 
-		//lÍ a linha da capacidade atÈ o caractere ":"
+		//l√ç a linha da capacidade at√à o caractere ":"
 		getline(dataFile, line, ':');
 
-		//lÍ a capacidade do bin e armazena na vari·vel adequada
+		//l√ç a capacidade do bin e armazena na vari¬∑vel adequada
 		dataFile >> binCapacity;
 
-		//imprime capacidade na tela, apenas para conferÍncia
+		//imprime capacidade na tela, apenas para confer√çncia
 		cout << "bin capacity is " << binCapacity << endl;
 
-		//ignora linhas atÈ encontrar a seÁ„o com demanda "DEMAND_SECTION"
+		//ignora linhas at√à encontrar a se√Å‚Äûo com demanda "DEMAND_SECTION"
 		do {
 			getline(dataFile, line);
 		} while (line.find("DEMAND") > 1);
 
-		//ignora cabeÁalho da matriz de demanda
+		//ignora cabe√Åalho da matriz de demanda
 		do {
 			getline(dataFile, line);
 		} while (line.length() == 0);
@@ -91,10 +93,54 @@ void Instances::load() {
 
 			vector<int> lineData;
 
-			//...loop que lÍ os dados coluna a coluna
+			//...loop que l√ç os dados coluna a coluna
 			for (int columns = 1; columns <= mCategories; columns++) {
 
-				//lÍ valor
+				//l√ç valor
+				dataFile >> input;
+
+				//armazena na linha
+				lineData.push_back(input);
+
+
+			}
+
+			//...armazena os dados da linha na matrix de dados de entrada
+			matrixData.push_back(lineData);
+
+
+		}
+#endif // !INST_AUGMENTED
+
+#ifdef INST_AUGMENTED
+
+		//l√ç a capacidade do bin e armazena na vari¬∑vel adequada
+		dataFile >> binCapacity;
+		dataFile >> input;
+		binCapacity = binCapacity*INST_NEW;
+
+		//imprime capacidade na tela, apenas para confer√çncia
+		cout << "bin capacity is " << binCapacity << endl;
+
+		//ignora linhas at√à encontrar a se√Å‚Äûo com demanda "DEMAND_SECTION"
+		do {
+			getline(dataFile, line);
+		} while (line.find("DEMAND") > 1);
+
+		//ignora cabe√Åalho da matriz de demanda
+		do {
+			getline(dataFile, line);
+		} while (line.length() == 0);
+
+		//enquanto existir linha de entrada
+		while (dataFile >> input) {
+
+			vector<int> lineData;
+
+			//...loop que l√ç os dados coluna a coluna
+			for (int columns = 1; columns <= mCategories; columns++) {
+
+				//l√ç valor
 				dataFile >> input;
 
 				//armazena na linha
@@ -109,16 +155,20 @@ void Instances::load() {
 
 		}
 
+#endif // INST_AUGMENTED
+
+
+
 		//printMatrix(matrixData);
 
 
 
-		//*************** TRANSFER NCIA PARA ESTRUTURA DE DADOS ESCOLHIDA ***************//
+		//*************** TRANSFER¬†NCIA PARA ESTRUTURA DE DADOS ESCOLHIDA ***************//
 
 		//varre coluna-a-coluna a matrixData
 		for (int column = 1; column <= mCategories; column++) {
 
-			//guarda a posiÁ„o do primeiro elemento da categoria
+			//guarda a posi√Å‚Äûo do primeiro elemento da categoria
 			firstObjectPosition.push_back(allElements.size());
 
 			for (unsigned line = 0; line < matrixData.size(); line++) {
@@ -129,11 +179,11 @@ void Instances::load() {
 					storeOfElement.push_back(line);
 				}
 
-			}//fim do loop que lÍ uma coluna inteira de matrixData
+			}//fim do loop que l√ç uma coluna inteira de matrixData
 
-		}//fim do loop que lÍ todas as colunas da matrixData
+		}//fim do loop que l√ç todas as colunas da matrixData
 
-		 //guarda n˙mero de elementos da inst‚ncia
+		 //guarda nÀômero de elementos da inst‚Äöncia
 		nElements = (int)allElements.size();
 
 	}//fim do procedimento realizado caso o arquivo de entrada tenha sido aberto com sucesso
@@ -142,13 +192,13 @@ void Instances::load() {
 
 
 
-	//impress„o na tela para conferÍncia
+	//impress‚Äûo na tela para confer√çncia
 	cout << "Elementos = {";
 	for (unsigned j = 0; j<allElements.size(); j++) {
 		cout << allElements.at(j) << " - ";
 	} cout << "}\n";
 
-	cout << "PosiÁ„o de cada categoria = {";
+	cout << "Posi√Å‚Äûo de cada categoria = {";
 	for (unsigned j = 0; j< firstObjectPosition.size(); j++) {
 		cout << firstObjectPosition.at(j) << " - ";
 	} cout << "}\n";
@@ -157,22 +207,34 @@ void Instances::load() {
 }
 
 
+//m√àtodo que resolve o problema relaxado
+void Instances::solveRelaxedProblem()
+{
+	int totalWeight=0;
+	for (unsigned j = 0; j < allElements.size(); j++) {
+		totalWeight += allElements.at(j);
+	}
+	if(totalWeight%binCapacity >0) lowerBound = totalWeight / binCapacity + 1;
+	else lowerBound = totalWeight / binCapacity;
+}
+
+
 #ifdef M_GRANDE
-//mÈtodo que monta o problema no Gurobi e o resolve
-void Instances::findLB() {
+//m√àtodo que monta o problema no Gurobi e o resolve, retornando a solu√Å‚Äûo encontrada
+vector<int> Instances::findOptimum() {
 
 	vector<int> codifiedSolution;
 
-	//otimizaÁ„o
+	//otimiza√Å‚Äûo
 	try {
 
-		//INICIALIZA«√O DO GUROBI E CRIA«√O DO MODELO DE OTIMIZA«√O
+		//INICIALIZA¬´‚àöO DO GUROBI E CRIA¬´‚àöO DO MODELO DE OTIMIZA¬´‚àöO
 		GRBEnv env = GRBEnv();
 		GRBModel model = GRBModel(env);
 
-		//DEFINI«√O DE VARI¡VEIS
+		//DEFINI¬´‚àöO DE VARI¬°VEIS
 
-		//Binaria y(i) indicando se bin i È usado
+		//Binaria y(i) indicando se bin i √à usado
 		GRBVar* y = 0;
 		y = model.addVars(nElements, GRB_BINARY);
 		model.update();
@@ -182,7 +244,7 @@ void Instances::findLB() {
 			y[i].set(GRB_StringAttr_VarName, name.str());
 		}
 
-		//Binaria x(i,j) que indica se objeto j est· alocado no bin i
+		//Binaria x(i,j) que indica se objeto j est¬∑ alocado no bin i
 		GRBVar** x = 0;
 		x = new GRBVar*[nElements];
 		for (int i = 0; i < nElements; i++) {
@@ -210,9 +272,9 @@ void Instances::findLB() {
 
 
 
-		//DEFINI«√O FUN«√O OBJETIVO
+		//DEFINI¬´‚àöO FUN¬´‚àöO OBJETIVO
 
-		//express„o que soma y_i
+		//express‚Äûo que soma y_i
 		GRBLinExpr totalBins = 0;
 		for (int i = 0; i < nElements; i++) {
 			totalBins += y[i];
@@ -221,9 +283,9 @@ void Instances::findLB() {
 		model.setObjective(totalBins, GRB_MINIMIZE);
 
 
-		//RESTRI«’ES DO MODELO
+		//RESTRI¬´‚ÄôES DO MODELO
 
-		//respeita capacidade dos bins e vincula vari·veis x(i,j) e y(i)
+		//respeita capacidade dos bins e vincula vari¬∑veis x(i,j) e y(i)
 		for (int i = 0; i < nElements; i++) {
 			GRBLinExpr weightOnBin = 0;
 			for (int j = 0; j < nElements; j++) {
@@ -250,18 +312,18 @@ void Instances::findLB() {
 
 			for (int k = 0; k < mCategories; k++) {
 
-				//calcula o Ìndice do ˙ltimo job da categoria k
+				//calcula o √åndice do Àôltimo job da categoria k
 				int last_j;
 				if (k + 1 < mCategories) last_j = firstObjectPosition[k + 1] - 1;
 				else last_j = nElements - 1;
 
-				//soma x[i][j] de todo j pertencente ‡ k
+				//soma x[i][j] de todo j pertencente ‚Ä° k
 				GRBLinExpr sum_xij_of_k = 0;
 				for (int j = firstObjectPosition[k]; j <= last_j; j++) {
 					sum_xij_of_k += x[i][j];
 				}
 
-				//cria restriÁ„o
+				//cria restri√Å‚Äûo
 				ostringstream cname;
 				cname << "Determine f(" << i << ")(" << k << ")";
 				model.addConstr(f[i][k] * M_GRANDE >= sum_xij_of_k, cname.str());
@@ -270,28 +332,28 @@ void Instances::findLB() {
 
 		}
 
-		//restriÁ„o de compatibilidade
+		//restri√Å‚Äûo de compatibilidade
 		for (int k = 0; k < mCategories; k++) {
 
 			for (int l = k + 1; l < mCategories; l++) {
 
-				//se o valor da matriz de compatibilidade das categorias k e l for 0, h· incompatibilidade
+				//se o valor da matriz de compatibilidade das categorias k e l for 0, h¬∑ incompatibilidade
 				if (compatibilityMatrix[k][l] == 0) {
 
-					//gera uma restriÁ„o para cada bin i
+					//gera uma restri√Å‚Äûo para cada bin i
 					for (int i = 0; i < nElements; i++) {
 						ostringstream cname;
 						cname << "AssureCategory(" << k << ")isntWithCategory(" << l << "onBin(" << i << ")";
 						model.addConstr(f[i][k] + f[i][l] <= 1, cname.str());
 					}
 
-				}//gera restriÁıes apenas quando c[k][l]=0
+				}//gera restri√Åƒ±es apenas quando c[k][l]=0
 
 			}
 
 		}
 
-		//restriÁ„o para reduzir espaÁo de soluÁıes
+		//restri√Å‚Äûo para reduzir espa√Åo de solu√Åƒ±es
 		for (int k = 0; k < nElements; k++) {
 			for (int l = k + 1; l < nElements; l++) {
 				ostringstream cname;
@@ -301,13 +363,17 @@ void Instances::findLB() {
 		}
 
 
-		//GERA ARQUIVO .lp COM MODELO CONSTRUÕDO
-		model.write("modelo.lp");
+		//GERA ARQUIVO .lp COM MODELO CONSTRU√ïDO
+		string mName;
+		mName = inputFile + ".lp";
+		model.update();
+		model.write(mName);
 
+		//Insere limite de tempo para rodar otimiza√Å‚Äûo
+		//model.getEnv().set(GRB_DoubleParam_TimeLimit, 600);
 
-		//RODA OTIMIZA«√O
+		//RODA OTIMIZA¬´‚àöO
 		model.optimize();
-
 
 		//IMPRIME RESULTADOS
 		int aux = 0;
@@ -317,7 +383,7 @@ void Instances::findLB() {
 
 			//cout << y[aux].get(GRB_StringAttr_VarName) << " = " << y[aux].get(GRB_DoubleAttr_X);
 
-			//insere separador na soluÁ„o, igual ao n˙mero do bin negativo
+			//insere separador na solu√Å‚Äûo, igual ao nÀômero do bin negativo
 			codifiedSolution.push_back(-1 * (aux + 1));
 
 			//percorre todos os x[i][j] do bin i
@@ -326,7 +392,7 @@ void Instances::findLB() {
 				//se o objeto j estiver no bin i
 				if (x[aux][j].get(GRB_DoubleAttr_X)>0) {
 					//cout << x[aux][j].get(GRB_StringAttr_VarName) << " = " << allElements[j] << ", ";
-					//insere o Ìndice do elemento no vetor soluÁ„o
+					//insere o √åndice do elemento no vetor solu√Å‚Äûo
 					codifiedSolution.push_back(j);
 				}
 
@@ -336,6 +402,7 @@ void Instances::findLB() {
 			aux += 1;
 
 		}
+		
 
 
 	}
@@ -348,8 +415,11 @@ void Instances::findLB() {
 		cout << "Exception during optimization" << endl;
 	}
 
+
 	Solution s(inputFile, codifiedSolution);
 	printMatrix(s.solution);
+
+	return codifiedSolution;
 
 }
 

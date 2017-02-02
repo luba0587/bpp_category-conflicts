@@ -2,12 +2,12 @@
 #include "randomc.h"
 
 
-//método de ordenação de categorias não-decrescentemente pelo grau de compatibilidade
+//mÃˆtodo de ordenaÃâ€o de categorias nâ€o-decrescentemente pelo grau de compatibilidade
 bool increasingCompDegree(Categories lhs, Categories rhs) {
 	return lhs.compDegree < rhs.compDegree;
 }
 
-//construtor da classe EA: cria instância usando solução inicial, executa heurística
+//construtor da classe EA: cria instâ€šncia usando soluÃâ€o inicial, executa heurÃŒstica
 EA::EA(Solution &s0)
 	: bestFitness(s0.getFitnessValue())
 {
@@ -15,18 +15,22 @@ EA::EA(Solution &s0)
 	applyEA();
 }
 
-//construtor que usa a instância - primeiro acha solução inicial pela construtiva depois executa a heurística
+//construtor que usa a instâ€šncia - primeiro acha soluÃâ€o inicial pela construtiva depois executa a heurÃŒstica
 EA::EA(Instances &inst)
-	:nItems(inst.getN()), binCapacity(inst.getBinCapacity()), name(inst.getName()), bestSolutionPosition(0)
+	:nItems(inst.getN()), binCapacity(inst.getBinCapacity()), name(inst.getName()), bestSolutionPosition(0), relaxedLB(inst.getRelaxedLB())
 {
+	if (inst.getBestLB() > 0) relaxedLB = inst.getBestLB();
 	name.resize(name.size() -4);
 	generate_s0(inst);
 	bestFitness = solutionPath.front().getFitnessValue();
-	applyEA();
-	printEvolution();
+	if (solutionPath.front().getNBins() > relaxedLB) {
+		applyEA();
+		printEvolution();
+	}
+	else cout << "\nSolucao inicial eh otima!\n";
 }
 
-//método que encontra solução inicial aplicando o First Fit modificado (categorias ordenadas) e a insere em SolutionPath
+//mÃˆtodo que encontra soluÃâ€o inicial aplicando o First Fit modificado (categorias ordenadas) e a insere em SolutionPath
 void EA::generate_s0(Instances &inst) {
 
 	//Cria estruturas de dados
@@ -49,31 +53,31 @@ void EA::generate_s0(Instances &inst) {
 
 	}
 
-	//ordena as categorias crescentemente pelo grau de compatibilidade (pra começar por menos compatíveis)
+	//ordena as categorias crescentemente pelo grau de compatibilidade (pra comeÃar por menos compatÃŒveis)
 	vector<Categories> sortedCategories = allCategories;
 	sort(sortedCategories.begin(), sortedCategories.end(), increasingCompDegree);
 
 	//percorre o vetor de categorias ordenadas, selecionando uma a uma
 	for (unsigned k = 0; k < sortedCategories.size(); k++) {
 
-		//calcula o índice do último elemento dessa categoria
+		//calcula o ÃŒndice do Ë™ltimo elemento dessa categoria
 		int last_j;
 		if (sortedCategories.at(k).index + 1 < (int)sortedCategories.size()) last_j = inst.getCategoryPosition().at(sortedCategories.at(k).index + 1) - 1;
 		else last_j = inst.getN() - 1;
 
-		//percorre uma a uma as tarefas da categoria em questão
+		//percorre uma a uma as tarefas da categoria em questâ€o
 		for (int j = inst.getCategoryPosition().at(sortedCategories.at(k).index); j <= last_j; j++) {
 
-			//abre primeiro bin, se não houver nenhum aberto
+			//abre primeiro bin, se nâ€o houver nenhum aberto
 			if (resultingBins.size()<1) {
 				Bins b(inst, notPickedElements.at(j));
 				resultingBins.push_back(b);
 			}
 
-			//caso contrário, tenta alocar no primeiro bin disponível
+			//caso contrÂ·rio, tenta alocar no primeiro bin disponÃŒvel
 			else {
 
-				//inicializa variável que indica se foi possível alocar o elemento em um bin já aberto
+				//inicializa variÂ·vel que indica se foi possÃŒvel alocar o elemento em um bin jÂ· aberto
 				int alocated = 0;
 
 				//percorre o vetor de bins procurando um onde o objeto caiba
@@ -88,26 +92,28 @@ void EA::generate_s0(Instances &inst) {
 
 				}
 
-				//se percorreu o vetor de bins e não conseguiu encaixar o elemento, cria um novo bin
+				//se percorreu o vetor de bins e nâ€o conseguiu encaixar o elemento, cria um novo bin
 				if (alocated <1) {
 					Bins b(inst, notPickedElements.at(j));
 					resultingBins.push_back(b);
 				}
 
-			}//fim do loop que tenta alocar o elemento nos bins já abertos e, se não consegue, cria um novo bin
+			}//fim do loop que tenta alocar o elemento nos bins jÂ· abertos e, se nâ€o consegue, cria um novo bin
 
-		}//fim do loop que aloca todos os elementos da k-ésima categoria ordenada
+		}//fim do loop que aloca todos os elementos da k-Ãˆsima categoria ordenada
 
 	}//fim do loop que percorre todas as categorias do problema
 
-	//cria objeto da classe solução usando o vetor de bins construído pela heurística
+	//cria objeto da classe soluÃâ€o usando o vetor de bins construÃŒdo pela heurÃŒstica
 	Solution s(inst.getName(), resultingBins);
 
-	//adiciona solução ao vetor solutionPath da classe EA
+	//adiciona soluÃâ€o ao vetor solutionPath da classe EA
 	solutionPath.push_back(s);
 
 }
 
+
+//estrutura que guarda o nË™mero da geraÃâ€o e o conjunto de soluÃÄ±es filho
 struct Geracoes {
 
 	unsigned geracao;
@@ -116,46 +122,50 @@ struct Geracoes {
 };
 
 
-//aplica meta-heurística (1-lambda) Estratégia Evolucionária
+//aplica meta-heurÃŒstica (1-lambda) EstratÃˆgia EvolucionÂ·ria
 void EA::applyEA() {
 
-	//critério de parada: número máximo de soluções avaliadas
-	unsigned stopCriterium = 300;
+	//critÃˆrio de parada: nË™mero mÂ·ximo de soluÃÄ±es avaliadas
+	unsigned genMax = 60;
 
-	//número de filhos de cada geração
-	unsigned offspring = 15;
+	//nË™mero de filhos de cada geraÃâ€o
+	unsigned offspring = 20;
 
-	//critério de estagnação (número máximo de gerações sem melhoria na solução incumbente)
+	//critÃˆrio de estagnaÃâ€o (nË™mero mÂ·ximo de geraÃÄ±es sem melhoria na soluÃâ€o incumbente)
 	unsigned maxStagnation = 10;
 	
-	//contador de gerações sem melhoria
+	//contador de geraÃÄ±es sem melhoria
 	unsigned stagCounter = 0;
 
-	//cria objeto da classe de gerarador de números aleatórios
-	CRandomMersenne ran(1);
+	//cria objeto para medir tempo de processamento
+	Timer t;
+
+	//cria objeto da classe de gerarador de nË™meros aleatÃ›rios
+	int seed = GetTickCount();
+	CRandomMersenne ran(seed);
 
 	//cria estrutura que guarda todos os resultados para gerar tabela 2
 	vector<Geracoes> evolucaoHeuristica;
 
-	//em cada geração de filhos criada:
-	for (unsigned gen = 0; gen < stopCriterium / offspring; gen++) {
+	//em cada geraÃâ€o de filhos criada:
+	for (unsigned gen = 0; gen < genMax; gen++) {
 
-		//estrutura que guarda todas as soluções filho de uma geração
+		//estrutura que guarda todas as soluÃÄ±es filho de uma geraÃâ€o
 		vector<Solution> offspringVector;
 
-		//variáveis que guardam a posição do melhor filho no vetor offspringVector e seu valor na função de fitness
+		//variÂ·veis que guardam a posiÃâ€o do melhor filho no vetor offspringVector e seu valor na funÃâ€o de fitness
 		unsigned bestSunPosition=0;
 		double bestSunValue=0;
 
-		//gera filhos a partir da solução pai, que é a última solução do vetor solutionPath
+		//gera filhos a partir da soluÃâ€o pai, que Ãˆ a Ë™ltima soluÃâ€o do vetor solutionPath
 		for (unsigned sun = 0; sun < offspring; sun++) {
 
-			//cria filho a partir de mutação do pai e o adiciona no vetor offspring (se não houver sucesso em maxTrials tentativas, simplesmente não cria filho!)
-			generateSun(offspringVector, ran);
+			//cria filho a partir de mutaÃâ€o do pai e o adiciona no vetor offspring (se nâ€o houver sucesso em maxTrials tentativas, simplesmente nâ€o cria filho!)
+			generateSun(offspringVector, ran, t);
 
-		}//fim do loop que gera 'offspring' filhos a partir de mutações da solução pai
+		}//fim do loop que gera 'offspring' filhos a partir de mutaÃÄ±es da soluÃâ€o pai
 
-		//escolhe o melhor filho da prole para ser próximo pai
+		//escolhe o melhor filho da prole para ser o prÃ›ximo pai
 		for (unsigned sun = 0; sun < offspringVector.size(); sun++) {
 
 			if (offspringVector.at(sun).getFitnessValue() > bestSunValue) {
@@ -165,39 +175,47 @@ void EA::applyEA() {
 
 		}//fim do loop que percorre todos os filhos no vetor offspringVector para selecionar o melhor deles
 
-		//insere o melhor filho da prole na última posição do vetor solutionPath
+		//insere o melhor filho da prole na Ë™ltima posiÃâ€o do vetor solutionPath
 		if (offspringVector.size()>0) solutionPath.push_back(offspringVector.at(bestSunPosition));
 
-		//verifica se houve mudança na solução incumbente
+		//guarda o tempo total para encontrar essa soluÃâ€o (tempo para gerar tods os filhos da prole e os avaliar)
+		float elapsedTime = t.elapsed();
+		solutionPath.back().setTime(elapsedTime);
+
+		//verifica se houve mudanÃa na soluÃâ€o incumbente. Caso positivo:
 		if (bestSunValue > bestFitness) {
 
-			//caso positivo, zera contador de estagnação...
+			//caso positivo, zera contador de estagnaÃâ€o...
 			stagCounter = 0;
 
-			//... atualiza posição da melhor solução encontrada
+			//... atualiza posiÃâ€o da melhor soluÃâ€o encontrada
 			bestSolutionPosition = solutionPath.size() - 1;
 
 			//... e atualiza valor de bestFitness
 			bestFitness = bestSunValue;
 
+			//... e verifica se critÃˆrio de parada por LB, parando a heurÃŒstica caso positivo
+			if (solutionPath.back().getNBins() == relaxedLB) break;
+
 		}
 
-		//caso negativo, adiciona unidade no contador de estagnção...
+		//caso negativo, adiciona unidade no contador de estagnaÃâ€o...
 		else {
 
 			stagCounter++;
 
-			//... e caso critério de estagnação máxima seja atingido
-			if (stagCounter > maxStagnation) {
+			//... e caso critÃˆrio de estagnaÃâ€o mÂ·xima seja atingido e esta nâ€o seja a Ë™ltima geraÃâ€o da heurÃŒstica
+			if (stagCounter > maxStagnation && gen + 1 < genMax) {
 
-				//se há maxStagnation gerações não houve melhoria, então avalio o pior filho da prole e o escolho como pai
-				cout << "Parada por estagnação!" << endl;
+				//cout << "Parada por estagnaÃâ€o!" << endl;
 
-				//variáveis para armazenar posição e valor do pior filho
-				unsigned worstSunPosition;
+				//se hÂ· maxStagnation geraÃÄ±es nâ€o houve melhoria, entâ€o avalio o pior filho da prole e o escolho como pai
+				
+				//variÂ·veis para armazenar posiÃâ€o e valor do pior filho
+				unsigned worstSunPosition=0;
 				double worstSunValue = bestSunValue;
 
-				//escolhe o melhor filho da prole para ser próximo pai
+				//escolhe o pior filho da prole para ser prÃ›ximo pai
 				for (unsigned sun = 0; sun < offspringVector.size(); sun++) {
 
 					if (offspringVector.at(sun).getFitnessValue() < worstSunValue) {
@@ -207,20 +225,22 @@ void EA::applyEA() {
 
 				}//fim do loop que percorre todos os filhos no vetor offspringVector para selecionar o pior deles
 
-				//removo pai recém-escolhido e armazenado na última posição do vetor solutionPath
+				//removo pai recÃˆm-escolhido e armazenado na Ë™ltima posiÃâ€o do vetor solutionPath (gravo antes seu tempo de processamento para usar na pior soluÃâ€o tb)
+				float time = solutionPath.back().getTime(); 
 				solutionPath.pop_back();
 				
-				//adiciono pior filho na última posição do vetor solutionPath, para ser par da próxima geração
-				if (offspringVector.size()>0) solutionPath.push_back(offspringVector.at(worstSunPosition));
+				//adiciono pior filho na Ë™ltima posiÃâ€o do vetor solutionPath, para ser pai da prÃ›xima geraÃâ€o
+				if (offspringVector.size() > 0) {
+					solutionPath.push_back(offspringVector.at(worstSunPosition));
+					solutionPath.back().setTime(time);
+				}
 
-				//zera contador de gerações sem melhoria
+				//zera contador de geraÃÄ±es sem melhoria
 				stagCounter = 0;
 
-			}//fim da condicional de atingimento do critério de estagnação
+			}//fim da condicional de atingimento do critÃˆrio de estagnaÃâ€o
 
-
-		}//fim da condicional para casos em que não há melhoria na solução incumbente
-
+		}//fim da condicional para casos em que nâ€o hÂ· melhoria na soluÃâ€o incumbente
 
 		//rotina para armazenar resultados - uso na tabela 2
 		Geracoes g;
@@ -229,27 +249,29 @@ void EA::applyEA() {
 
 		evolucaoHeuristica.push_back(g);
 
-	}//fim do loop que cria stopCriterium/offspring gerações
+	}//fim do loop que cria stopCriterium/offspring geraÃÄ±es
 
-	//geração dos arquivos de saída
+	
+	 
+	 //***********geraÃâ€o dos arquivos de saÃŒda
 
+	/*
 	//nome do arquivo com tabela 2 - resultado detalhado da ES
 	ostringstream outputFile;
-	outputFile << name << " - Tabela 2.csv";
+	outputFile << name << "-TabelaSolucoes.csv";
 	
-
 	//cria arquivo de resultados
 	ofstream tabela2;
 	tabela2.open(outputFile.str());
 
-	//cria cabeçalho da tabela 2
+	//cria cabeÃalho da tabela 2
 	tabela2 << "Geracao;filho;bin;objeto;peso;categoria\n";
 
-	//salva saídas da tabela 2
-	//para cada geração
+	//salva saÃŒdas da tabela 2
+	//para cada geraÃâ€o
 	for (unsigned g = 0; g < evolucaoHeuristica.size(); g++) {
 		
-		//para cada filho da geração
+		//para cada filho da geraÃâ€o
 		for (unsigned s = 0; s < evolucaoHeuristica.at(g).filhos.size(); s++) {
 
 			//para cada bin do filho
@@ -273,21 +295,74 @@ void EA::applyEA() {
 
 	tabela2.close();
 
+	//nome do arquivo com tabela 3 - evoluÃâ€o da ES
+	ostringstream outputFile2;
+	outputFile2 << name << "-" << INST_NEW << "cap-evolucao.csv";
+
+	//cria arquivo de resultados
+	ofstream tabela3;
+	tabela3.open(outputFile2.str());
+
+	//cria cabeÃalho da tabela 3
+	tabela3 << "IteraÃâ€o;GeraÃâ€o;Tempo decorrido(s);Valor do filho\n";
+	int it = 1;
+
+	//percorre todas as geraÃÄ±es
+	for (unsigned g = 0; g < evolucaoHeuristica.size(); g++) {
+
+		//percorre o vetor de filhos da geraÃâ€o
+		for (unsigned j = 0; j < evolucaoHeuristica.at(g).filhos.size(); j++) {
+
+			tabela3 << it << ";"
+				<< g << ";"
+				<< evolucaoHeuristica.at(g).filhos.at(j).getTime() << ";"
+				<< evolucaoHeuristica.at(g).filhos.at(j).getFitnessValue() << "\n";
+	
+			it++;
+
+		}
+
+	}
+	tabela3.close();
+
+	//nome do arquivo com tabela 4 - solution Path
+	ostringstream outputFile3;
+	outputFile3 << name <<"-" << INST_NEW << "cap-solutionPath.csv";
+
+	//cria arquivo de resultados
+	ofstream tabela4;
+	tabela4.open(outputFile3.str());
+
+	//cria cabeÃalho da tabela 2
+	tabela4 << "Tempo;Valor da SoluÃâ€o\n";
+
+	for (unsigned sol = 0; sol < solutionPath.size(); sol++) {
+
+		tabela4 << solutionPath.at(sol).getTime() << ";"
+			<< solutionPath.at(sol).getFitnessValue() << "\n";
+
+	}
+
+	tabela4.close();  //fIM DA GERAÂ«âˆšO DE ARQUIVOS DE SAÃ•DA
+
+	*/	
+	//fIM DA GERAÂ«âˆšO DE ARQUIVOS DE SAÃ•DA
+
 }
 
 
-void EA::generateSun(vector<Solution> &offspring, CRandomMersenne &ran) {
+void EA::generateSun(vector<Solution> &offspring, CRandomMersenne &ran, Timer t) {
 
-	//cria vetor de bins da solução filho
+	//cria vetor de bins da soluÃâ€o filho
 	Solution sun(solutionPath.back().getInstName(), solutionPath.back().binsVector);
 
-	//número máximo de tentativas de gerar filho viável 
+	//nË™mero mÂ·ximo de tentativas de gerar filho viÂ·vel 
 	unsigned maxTrials = 2 * nItems / 3;
 	
-	//inicializa variável auxiliar que vale 1 caso filho tenha sido criado com sucesso e 0 caso contrário
+	//inicializa variÂ·vel auxiliar que vale 1 caso filho tenha sido criado com sucesso e 0 caso contrÂ·rio
 	int success = 0;
 
-	//inicializa contador de tentativas de construir filho viável sorteando um item para troca de bin
+	//inicializa contador de tentativas de construir filho viÂ·vel sorteando um item para troca de bin
 	int trials = 0;
 
 	//sorteia aleatoriamente um bin 
@@ -298,7 +373,7 @@ void EA::generateSun(vector<Solution> &offspring, CRandomMersenne &ran) {
 		//atualiza contador de tentativas
 		trials += 1;
 
-		//sorteia aleatoriamente um objeto no bin escolhido (OBS: elementos em bins com menos elementos terão maior probabilidade de serem trocados de posição)
+		//sorteia aleatoriamente um objeto no bin escolhido (OBS: elementos em bins com menos elementos terâ€o maior probabilidade de serem trocados de posiÃâ€o)
 		int random_j = ran.IRandom(0, solutionPath.back().binsVector.at(random_b).elements.size()-1);
 
 		//percorre o vetor de um bins procurando o primeiro em que o elemento random_j do bin random_b caiba
@@ -307,7 +382,7 @@ void EA::generateSun(vector<Solution> &offspring, CRandomMersenne &ran) {
 			//se b for diferente do bin de origem do objeto a inserir
 			if ((int) b != random_b) {
 
-				//se o elemento na posição random_j do random_bin cabe no bin b:
+				//se o elemento na posiÃâ€o random_j do random_bin cabe no bin b:
 				if (solutionPath.back().binsVector.at(b).binFit(solutionPath.back().binsVector.at(random_b).elements.at(random_j)) == 1) {
 
 					//adiciona o elemento ao bin encontrado
@@ -324,50 +399,51 @@ void EA::generateSun(vector<Solution> &offspring, CRandomMersenne &ran) {
 
 					}
 
-					//atualiza os atributos da solução filho
+					//atualiza os atributos da soluÃâ€o filho
 					sun.updateSolution();
 
-					//recalcula o fitnessValue da solução filho
+					//recalcula o fitnessValue da soluÃâ€o filho
 					sun.calculateFitness();
 
-					//imprime na tela (conferência)
-					cout << "Inserção do objeto " << solutionPath.back().binsVector.at(random_b).elements.at(random_j).index
-						<< " do bin " << random_b+1 << " no bin " << b+1 << endl<<endl;
+					//calcula o tempo de processamento atÃˆ a criaÃâ€o desse filho
+					float elapsedTime = t.elapsed();
+					sun.setTime(elapsedTime);
 
-					//altera valor da variável success e interrompe busca por bin em que o elemento sorteado caiba
+					//imprime na tela (conferÃncia)
+					/*cout << "InserÃâ€o do objeto " << solutionPath.back().binsVector.at(random_b).elements.at(random_j).index
+						<< " do bin " << random_b+1 << " no bin " << b+1 << endl<<endl;*/
+
+					//altera valor da variÂ·vel success e interrompe busca por bin em que o elemento sorteado caiba
 					success = 1;
 					break;
 
 				}//fim da condicional utilizada quando o elemento cabe no bin b
 
-			}//fim da condicional que só avalia inserção em bin diferente do original (random_b)
+			}//fim da condicional que sÃ› avalia inserÃâ€o em bin diferente do original (random_b)
 
 		}//fim do loop que procura bin onde o elemento sorteado caiba, percorrendo todo o vetor de bins
 
-		//se já tiver feito (sem sucesso) muitas tentativas de inserção (nItem/3), muda o bin sorteado
+		//se jÂ· tiver feito (sem sucesso) muitas tentativas de inserÃâ€o (nItem/3), muda o bin sorteado
 		if(success == 0 && trials == nItems/3) random_b = ran.IRandom(0, solutionPath.back().getNBins()-1);
 
 	} while (success == 0 && trials<maxTrials);
 
 
-	//se houve sucesso na criação de solução filho
+	//se houve sucesso na criaÃâ€o de soluÃâ€o filho
 	if (success == 1) {
 
-		//atualiza vetor de soluções
+		//atualiza vetor de soluÃÄ±es
 		offspring.push_back(sun);
-		
-		//imprime na tela que filho foi criado com sucesso
-		cout << "\nSolucao filho numero " << offspring.size() << " encontrada com sucesso! Fitness alterado de "
-			<< solutionPath.back().getFitnessValue() << " para "
-			<< offspring.back().getFitnessValue() << endl;
-		
-		//imprime solução filho
-		/*cout << "Solução filho:"<< endl;
-		printMatrix(offspring.back().solution);*/
-
+	
 	}
 
-	//altera número de bins da solução caso tenha havido redução (não deveria mais precisar dessa linha, pq já está sendo feito isso em updateSolution()
+	//se nâ€o tiver havido sucesso na criaÃâ€o do filho, copia o pai
+	else {
+		offspring.push_back(solutionPath.back());
+		offspring.back().setTime(t.elapsed());
+	}
+
+	//altera nË™mero de bins da soluÃâ€o caso tenha havido reduÃâ€o (nâ€o deveria mais precisar dessa linha, pq jÂ· estÂ· sendo feito isso em updateSolution()
 	if (sun.binsVector.size() < sun.getNBins()) sun.resetNumberBins(sun.binsVector.size());
 
 

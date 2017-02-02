@@ -1,6 +1,6 @@
 #include "HeaderBPP.h"
 
-//construtor que cria matrix de soluÁ„o decodificando a representaÁ„o da soluÁ„o em vetor ˙nico
+//construtor que cria matrix de solu√Å‚Äûo decodificando a representa√Å‚Äûo da solu√Å‚Äûo em vetor Àônico
 Solution::Solution(string inst, vector<int> solutionCode)
 	: instanceName(inst), codifiedSolution(solutionCode)
 {
@@ -17,7 +17,7 @@ Solution::Solution(string inst, vector<int> solutionCode)
 }
 
 
-//construtor que cria matriz de soluÁ„o decodificando a representaÁ„o da soluÁ„o em vetor de bins
+//construtor que cria matriz de solu√Å‚Äûo decodificando a representa√Å‚Äûo da solu√Å‚Äûo em vetor de bins
 Solution::Solution(string inst, vector<Bins> bins)
 	: instanceName(inst), binsVector(bins), fitnessValue(0)
 {
@@ -29,52 +29,52 @@ Solution::Solution(string inst, vector<Bins> bins)
 			codifiedSolution.push_back(bins.at(b).elements.at(j).index);
 		}
 		solution.push_back(elementsOnBin);
-		double fitnessContribution = 1.0 - (double)(bins.at(b).idleCapacity) / (double) (bins.at(b).capacity);
-		fitnessContribution = fitnessContribution*fitnessContribution;
+		float fitnessContribution = 1.0 - (float)(bins.at(b).idleCapacity) / (float) (bins.at(b).capacity);
+		fitnessContribution = fitnessContribution*fitnessContribution*fitnessContribution*fitnessContribution;
 		fitnessValue += fitnessContribution;
 	}
 	numberOfBins = solution.size();
 }
 
-//mÈtodo que calcula o fitnessValue de uma soluÁ„o
+//m√àtodo que calcula o fitnessValue de uma solu√Å‚Äûo
 void Solution::calculateFitness() {
 	
 	//zera o valor da fitness function
 	fitnessValue = 0.0;
 
-	//para cada bin do vetor de bins da soluÁ„o
+	//para cada bin do vetor de bins da solu√Å‚Äûo
 	for (unsigned b = 0; b < numberOfBins; b++) {
 
-		//calcula a parcela de contribuiÁ„o ‡ Fitness Function do bin b (capacity-idleCapacity)/capacity
-		double fitnessContribution = 1.0 - (double)(binsVector.at(b).idleCapacity) / (double)(binsVector.at(b).capacity);
+		//calcula a parcela de contribui√Å‚Äûo ‚Ä° Fitness Function do bin b (capacity-idleCapacity)/capacity
+		float fitnessContribution = 1.0 - (float)(binsVector.at(b).idleCapacity) / (float)(binsVector.at(b).capacity);
 
 		//eleva ao quadrado tal parcela
-		fitnessContribution = fitnessContribution*fitnessContribution;
+		fitnessContribution = fitnessContribution*fitnessContribution*fitnessContribution*fitnessContribution;
 
-		//soma tal parcela ao fitnessValue da soluÁ„o
+		//soma tal parcela ao fitnessValue da solu√Å‚Äûo
 		fitnessValue += fitnessContribution;
 
 	}
 
 }
 
-//mÈtodo que cria matriz solution e vetor com soluÁ„o codificada a partir de vetor de bins, atualizando tambÈm o n˙mero de bins
+//m√àtodo que cria matriz solution e vetor com solu√Å‚Äûo codificada a partir de vetor de bins, atualizando tamb√àm o nÀômero de bins
 void Solution::updateSolution() {
 
 	//limpa as duas estruturas de dados a atualizar
 	codifiedSolution.clear();
 	solution.clear();
 
-	//percorre o vetor de bins da soluÁ„o, selecionando um a um
+	//percorre o vetor de bins da solu√Å‚Äûo, selecionando um a um
 	for (unsigned b = 0; b<binsVector.size(); b++) {
 		
-		//insere o separador na soluÁ„o codificada, com valor = Ìndice do bin, negativo
+		//insere o separador na solu√Å‚Äûo codificada, com valor = √åndice do bin, negativo
 		codifiedSolution.push_back(-1 * (b + 1));
 		
-		//cria vetor de inteiros para guardar os Ìndices dos objetos de cada bin
+		//cria vetor de inteiros para guardar os √åndices dos objetos de cada bin
 		vector<int> elementsOnBin;
 		
-		//percorre o vetor de elementos do bin, populando o vetor de elementos e da soluÁ„o codificada
+		//percorre o vetor de elementos do bin, populando o vetor de elementos e da solu√Å‚Äûo codificada
 		for (unsigned j = 0; j<binsVector.at(b).elements.size(); j++) {
 			elementsOnBin.push_back(binsVector.at(b).elements.at(j).index);
 			codifiedSolution.push_back(binsVector.at(b).elements.at(j).index);
@@ -83,9 +83,9 @@ void Solution::updateSolution() {
 		//guarda o vetor de inteiros na matriz solution
 		solution.push_back(elementsOnBin);
 
-	}//fim do loop que percorre todos os bins da soluÁ„o
+	}//fim do loop que percorre todos os bins da solu√Å‚Äûo
 
-	//atualiza o n˙mero de bins na soluÁ„o
+	//atualiza o nÀômero de bins na solu√Å‚Äûo
 	numberOfBins = solution.size();
 
 }
